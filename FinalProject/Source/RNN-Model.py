@@ -8,6 +8,20 @@ from keras.models import Model
 from keras.layers import Input
 from keras.layers import LSTM
 from keras.layers import Dense
+import os
+
+#load data from the input and output folder
+def load_data():
+	X, Y = [], []
+	input_path = os.path.join(os.getcwd(), "Input")
+	output_path = os.path.join(os.getcwd(), "Output")
+
+	for file in os.listdir(input_path):
+		with open(os.path.join(input_path, file)) as f:
+			X.append(f.read())
+		with open(os.path.join(output_path, file)) as f:
+			Y.append(f.read())
+	return X, Y
 
 # generate a sequence of random integers
 def generate_sequence(length, n_unique):
