@@ -11,6 +11,7 @@ from keras.layers import Input
 from keras.layers import LSTM
 from keras.layers import Dense
 from keras.callbacks import EarlyStopping
+from keras.preprocessing.sequence import pad_sequences
 
 def load_data():
     X, Y = [], []
@@ -96,17 +97,44 @@ def split_test(X1, y, test_size):
 
     return X1_train, X1_test, y_train, y_test
 
+# generate target given source sequence
+def predict_sequence(infenc, infdec, source, n_steps, cardinality):
+    # encode
+    state = infenc.predict(source)
+    # start of sequence input
+    target_seq = array([0.0 for _ in range(cardinality)]).reshape(1, 1, cardinality)
+    # collect predictions
+    output = list()
+    for t in range(n_steps):
+        # predict next char
+        yhat, h, c = infdec.predict([target_seq] + state)
+        # store prediction
+        output.append(yhat[0,0,:])
+        # update state
+        state = [h, c]
+        # update target sequence
+        target_seq = yhat
+    return array(output)
+
+
+# decode a one hot encoded string
+def one_hot_decode(encoded_seq):
+    return [argmax(vector) for vector in encoded_seq]
+
+
+
+
 if __name__ == '__main__':
     n_features = 200 + 1
 
-    train, infenc, infdec = define_models(n_features, n_features, 300)
-    train.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model, infenc, infdec = define_models(n_features, n_features, 300)
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     input_data, output_data = load_data()
     tokenizer = Tokenizer(num_words=10000)
     tokenizer.fit_on_texts(input_data)
 
-    X1, y = get_dataset(input_data, output_data, n_features, 10)
+    X1, y = get_dataset(input_data, output_data, n_features, 100)
     X1_train, X1_test, y_train, y_test = split_test(X1, y, test_size=0.2)
 
     X2_train = decoder_input(y_train)
@@ -114,6 +142,27 @@ if __name__ == '__main__':
 
     early_stop = EarlyStopping(monitor='val_loss', mode='min', verbose=1)
 
-    history = train.fit([X1_train, X2_train], y_train, epochs=200, batch_size=1, validation_data=([X1_test, X2_test], y_test))
+    history = model.fit([X1_train, X2_train], y_train, epochs=200, batch_size=24, validation_data=([X1_test, X2_test], y_test))
 
-    prediction = train.predict()
+    new_data = []
+    with open(os.path.join(os.getcwd(), "predict.txt")) as f:
+        new_data.append(f.read())
+    tokenizer.fit_on_texts(new_data)
+    new_data = tokenizer.texts_to_sequences(new_data)
+    X_new = []
+    for i in range(len(new_data)):
+        for j in range(len(new_data[i])):
+            X_new.append(to_categorical(new_data[i][j], num_classes=n_features))
+
+    X_new = np.array(X_new)
+    X_new = X_new[0:10]
+    X_new = X_new.reshape(int(10 / 10), 10, n_features)
+
+    target = predict_sequence(infenc, infdec, X_new, 10, n_features)
+
+    yhat = [one_hot_decode(target)]
+    text = tokenizer.sequences_to_texts(yhat)
+    print(new_data)
+    print(text)
+
+    #print(text)
