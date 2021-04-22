@@ -1,5 +1,4 @@
 import os
-
 import numpy as np
 from keras.preprocessing.text import Tokenizer
 from numpy import array
@@ -15,8 +14,8 @@ from keras.preprocessing.sequence import pad_sequences
 
 def load_data():
     X, Y = [], []
-    input_path = os.path.join(os.getcwd(), "Input")
-    output_path = os.path.join(os.getcwd(), "Output")
+    input_path = os.path.join(os.getcwd(), "Source/Input")
+    output_path = os.path.join(os.getcwd(), "Source/Output")
 
     for file in os.listdir(input_path):
         with open(os.path.join(input_path, file)) as f:
@@ -26,7 +25,7 @@ def load_data():
     return X, Y
 
 
-def get_dataset(X, Y, n_features, lenght):
+def get_dataset(X, Y, n_features, lenght, tokenizer):
     X = tokenizer.texts_to_sequences(X)
     Y = tokenizer.texts_to_sequences(Y)
 
@@ -122,47 +121,3 @@ def one_hot_decode(encoded_seq):
     return [argmax(vector) for vector in encoded_seq]
 
 
-
-
-if __name__ == '__main__':
-    n_features = 200 + 1
-
-    model, infenc, infdec = define_models(n_features, n_features, 300)
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-
-    input_data, output_data = load_data()
-    tokenizer = Tokenizer(num_words=10000)
-    tokenizer.fit_on_texts(input_data)
-
-    X1, y = get_dataset(input_data, output_data, n_features, 100)
-    X1_train, X1_test, y_train, y_test = split_test(X1, y, test_size=0.2)
-
-    X2_train = decoder_input(y_train)
-    X2_test = decoder_input(y_test)
-
-    early_stop = EarlyStopping(monitor='val_loss', mode='min', verbose=1)
-
-    history = model.fit([X1_train, X2_train], y_train, epochs=200, batch_size=24, validation_data=([X1_test, X2_test], y_test))
-
-    new_data = []
-    with open(os.path.join(os.getcwd(), "predict.txt")) as f:
-        new_data.append(f.read())
-    tokenizer.fit_on_texts(new_data)
-    new_data = tokenizer.texts_to_sequences(new_data)
-    X_new = []
-    for i in range(len(new_data)):
-        for j in range(len(new_data[i])):
-            X_new.append(to_categorical(new_data[i][j], num_classes=n_features))
-
-    X_new = np.array(X_new)
-    X_new = X_new[0:10]
-    X_new = X_new.reshape(int(10 / 10), 10, n_features)
-
-    target = predict_sequence(infenc, infdec, X_new, 10, n_features)
-
-    yhat = [one_hot_decode(target)]
-    text = tokenizer.sequences_to_texts(yhat)
-    print(new_data)
-    print(text)
-
-    #print(text)
